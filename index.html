@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ASCII Face Maker</title>
+<style>
+@font-face {
+  font-family: 'jgs5';
+  src: url('./fonts/jgs5.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  overflow: hidden;
+  width: 100vw;
+  height: 100vh;
+  background: #000;
+}
+
+#screen {
+  position: fixed;
+  top: 0; left: 0;
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+pre {
+  font-family: 'jgs5', monospace;
+  white-space: pre;
+  overflow: hidden;
+  cursor: text;
+  user-select: none;
+  line-height: 1;
+}
+
+.cmd-line {
+  display: block;
+  cursor: pointer;
+}
+
+.cursor {
+  animation: blink 1s step-end infinite;
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+</style>
+</head>
+<body>
+<div id="screen">
+  <pre id="terminal"></pre>
+</div>
+
+<script>
+// ─── COLOR ENGINE ────────────────────────────────────────────────────────────
+const NIGHT_DARK  = ["#000","#400","#040","#004","#440","#044","#404","#222"];
+const NIGHT_LIGHT = ["#888","#F88","#8F8","#88F","#FF8","#8FF","#F8F","#FFF"];
+const DAY_DARK    = ["#000","#800","#080","#008","#880","#088","#808","#888"];
+const DAY_LIGHT   = ["#CCC","#FCC","#CFC","#CCF","#FFC","#CFF","#FCF","#FFF"];
+
+function randomColors() {
+  const night = Math.random() > 0.5;
+  const di = Math.floor(Math.random() * 8);
+  const li = Math.floor(Math.random() * 8);
+  if (night) return { fg: NIGHT_LIGHT[li], bg: NIGHT_DARK[di] };
+  return { fg: DAY_DARK[di], bg: DAY_LIGHT[li] };
+}
+
+let colors = randomColors();
+function applyColors(fg, bg) {
+  colors = { fg, bg };
+  document.body.style.background = bg;
+  terminal.style.color = fg;
+  document.getElementById('screen').style.background = bg;
+}
+
+// ─── FONT SCALING ────────────────────────────────────────────────────────────
+let fontSize = 10;
+function updateFont() {
+  fontSize = Math.max(10, 10 * Math.floor(window.innerWidth / 400));
+  const charW = fontSize / 2;
+  const termW = charW * 80;
+  const termH = fontSize * 22;
+  terminal.style.fontSize = fontSize + 'px';
+  terminal.style.lineHeight = fontSize + 'px';
+  terminal.style.width = termW + 'px';
+  terminal.style.height = termH + 'px';
+}
+window.addEventListener('resize', updateFont);
+
+// ─── ASSET DATA ──────────────────────────────────────────────────────────────
+function B() { return Array(13).fill("                     "); }
+
+const A = {
+  cloth_0: B(),
+  cloth_1: ["                     ","                     ","                     ","                     ","                     ","                     ","                     ","                     ","                     ","                     ","      /       \\      "," _.-~'         `~-._ ","'                   `"],
+  cloth_2: ["                     ","                     ","                     ","                     ","                     ","                     ","                     ","                     ","                     ","                     ","      /'     `\\      "," _.-~' ._\\ /_. `~-._ ","'        `.'        `"],
+  cloth_3: ["                     ","                     ","                     ","                     ","                     ","                     ","                     ","                     ","                     ","                     ","      /'     `\\      "," _.-;' ._\\ /_. `:-._ ","' \\ \\    `.'    / / `"],
+  cloth_4: ["                     ","                     ","                     ","                     ","                     ","                     ","                     ","                     ","                     ","       _     _       ","     _/ `._.' \\_     "," _.-~ \\/[>O<]\\/ ~-._ ","'       \\ : /       `"],
+  cloth_5: ["                     ","                     ","                     ","                     ","                     ","                     ","                     ","                     ","                     ","                     ","     _/`-._.-'\\_     "," _.-~ \\_/(_)\\_/ ~-._ ","'      \\ / \\ /      `"],
+  cloth_6: ["                     ","                     ","                     ","                     ","                     ","                     ","                     ","                     ","                     ","                     ","      /`-._.-'\\      "," _.-~'\\_/(_)\\_/`~-._ ","'        / \\        `"],
+  cloth_7: ["                     ","                     ","                     ","                     ","                     ","                     ","                     ","                     ","                     ","       _     _       ","     _/ `.~.' \\_     "," _.-~  \\ (·) /  ~-._ ","'      `._.'`       `"],
+
+  chin_0: B(),
+  chin_1: ["                     ","                     ","                     ","       .-~~~-.       ","      /       \\      ","      !       !      ","     (.       .)     ","       \\     /       ","       |\\   /|       ","       ! `-' !       ","                     ","                     ","                     "],
+  chin_2: ["                     ","                     ","                     ","       .-~~~-.       ","      /       \\      ","      !       !      ","     (.       .)     ","      !       !      ","       \\     /       ","       !`---'!       ","                     ","                     ","                     "],
+  chin_3: ["                     ","                     ","                     ","       .-~~~-.       ","      /       \\      ","      !       !      ","     (.       .)     ","      !       !      ","       \\     /       ","       !`._.'!       ","                     ","                     ","                     "],
+  chin_4: ["                     ","                     ","                     ","       .-~~~-.       ","      /       \\      ","      !       !      ","     (.       .)     ","      |       |      ","      !       !      ","       !.___.!       ","                     ","                     ","                     "],
+  chin_5: ["                     ","                     ","                     ","       .-~~~-.       ","      /       \\      ","      !       !      ","     (.       .)     ","      |       |      ","      !       !      ","       \\.___./       ","                     ","                     ","                     "],
+  chin_6: ["                     ","                     ","                     ","       .-~~~-.       ","      /       \\      ","      !       !      ","     (.       .)     ","      /       \\      ","      \\       /      ","       !.___.!       ","                     ","                     ","                     "],
+  chin_7: ["                     ","                     ","                     ","       .-~~~-.       ","      /       \\      ","      !       !      ","     (.       .)     ","      |       |      ","      !       !      ","      (       )      ","       `~---~'       ","                     ","                     "],
+  chin_8: ["                     ","                     ","                     ","       .-~~~-.       ","      /       \\      ","      !       !      ","     (.       .)     ","      7       <      ","     (         )     ","      `._   _.'      ","         `~'         ","                     ","                     "],
+
+  eyebrows_0: B(),
+  eyebrows_1: ["                     ","                     ","                     ","                     ","                     ","        _   _        ","                     ","                     ","                     ","                     ","                     ","                     ","                     "],
+  eyebrows_2: ["                     ","                     ","                     ","                     ","                     ","        -   -        ","                     ","                     ","                     ","                     ","                     ","                     ","                     "],
+  eyebrows_3: ["                     ","                     ","                     ","                     ","                     ","        .   .        ","                     ","                     ","                     ","                     ","                     ","                     ","                     "],
+  eyebrows_4: ["                     ","                     ","                     ","                     ","                     ","        ~   ~        ","                     ","                     ","                     ","                     ","                     ","                     ","                     "],
+  eyebrows_5: ["                     ","                     ","                     ","                     ","                     ","        ·   ·        ","                     ","                     ","                     ","                     ","                     ","                     ","                     "],
+  eyebrows_6: ["                     ","                     ","                     ","                     ","                     ","        ^   ^        ","                     ","                     ","                     ","                     ","                     ","                     ","                     "],
+  eyebrows_7: ["                     ","                     ","                     ","                     ","                     ","       /¬ ¬\\         ","                     ","                     ","                     ","                     ","                     ","                     ","                     "],
+  eyebrows_8: ["                     ","                     ","                     ","                     ","                     ","       ==   ==       ","                     ","                     ","                     ","                     ","                     ","                     ","                     "],
+
+  eyes_0: B(),
+  eyes_1: ["                     ","                     ","                     ","                     ","                     ","                     ","        o   o        ","                     ","                     ","                     ","                     ","                     ","                     "],
+  eyes_2: ["                     ","                     ","                     ","                     ","                     ","                     ","        O   O        ","                     ","                     ","                     ","                     ","                     ","                     "],
+  eyes_3: ["                     ","                     ","                     ","                     ","                     ","                     ","        -   -        ","                     ","                     ","                     ","                     ","                     ","                     "],
+  eyes_4: ["                     ","                     ","                     ","                     ","                     ","                     ","        ·   ·        ","                     ","                     ","                     ","                     ","                     ","                     "],
+  eyes_5: ["                     ","                     ","                     ","                     ","                     ","                     ","        °   °        ","                     ","                     ","                     ","                     ","                     ","                     "],
+
+  noze_0: B(),
+  noze_1: ["                     ","                     ","                     ","                     ","                     ","                     ","                     ","          L          ","                     ","                     ","                     ","                     ","                     "],
+  noze_2: ["                     ","                     ","                     ","                     ","                     ","                     ","                     ","          <          ","                     ","                     ","                     ","                     ","                     "],
+  noze_3: ["                     ","                     ","                     ","                     ","                     ","                     ","                     ","          c          ","                     ","                     ","                     ","                     ","                     "],
+  noze_4: ["                     ","                     ","                     ","                     ","                     ","                     ","                     ","          n          ","                     ","                     ","                     ","                     ","                     "],
+  noze_5: ["                     ","                     ","                     ","                     ","                     ","                     ","                     ","          v          ","                     ","                     ","                     ","                     ","                     "],
+  noze_6: ["                     ","                     ","                     ","                     ","                     ","                     ","                     ","          V          ","                     ","                     ","                     ","                     ","                     "],
+  noze_7: ["                     ","                     ","                     ","                     ","                     ","                     ","                     ","          J          ","                     ","                     ","                     ","                     ","                     "],
+
+  extras_0: B(),
+  extras_1: ["                     ","                     ","                     ","                     ","                     ","                     ","                     ","                     ","         ' `         ","                     ","                     ","                     ","                     "],
+  extras_2: ["                     ","                     ","                     ","                     ","                     ","                     ","      ·         ·    ","                     ","                     ","                     ","                     ","                     ","                     "],
+  extras_3: ["                     ","                     ","                     ","                     ","                     ","                     ","      *         *    ","                     ","                     ","                     ","                     ","                     ","                     "],
+  extras_4: ["                     ","                     ","                     ","                     ","                     ","                     ","      ..       ..    ","                     ","                     ","                     ","                     ","                     ","                     "],
+  extras_5: ["                     ","                     ","                     ","                     ","                     ","                     ","                     ","     ;           ;   ","                     ","                     ","                     ","                     ","                     "],
+  extras_6: ["                     ","                     ","                     ","                     ","                     ","                     ","      ~         ~    ","                     ","                     ","                     ","                     ","                     ","                     "],
+
+  mouth_0: B(),
+  mouth_1: ["                     ","                     ","                     ","                     ","                     ","                     ","                     ","                     ","          -          ","                     ","                     ","                     ","                     "],
+  mouth_2: ["                     ","                     ","                     ","                     ","                     ","                     ","                     ","                     ","         `-'         ","                     ","                     ","                     ","                     "],
+  mouth_3: ["                     ","                     ","                     ","                     ","                     ","                     ","                     ","                     ","         .-.         ","                     ","                     ","                     ","                     "],
+  mouth_4: ["                     ","                     ","                     ","                     ","                     ","                     ","                     ","                     ","         ·-·         ","                     ","                     ","                     ","                     "],
+  mouth_5: ["                     ","                     ","                     ","                     ","                     ","                     ","                     ","                     ","         )-(         ","                     ","                     ","                     ","                     "],
+
+  hair_0: B(),
+  hair_1: ["                     ","                     ","                     ","       .:=:=:.       ","      i;'~ ~`:i      ","                     ","                     ","                     ","                     ","                     ","                     ","                     ","                     "],
+  hair_2: ["                     ","                     ","                     ","       .=(((=.       ","      i;'   `:i      ","                     ","                     ","                     ","                     ","                     ","                     ","                     ","                     "],
+  hair_3: ["                     ","                     ","                     ","       .-~~~-.       ","      (//'~`\\\\)      ","                     ","                     ","                     ","                     ","                     ","                     ","                     ","                     "],
+  hair_4: ["                     ","                     ","        _..._        ","      .~(|||)~.      ","     ((//'~`\\\\))     ","     (         )     ","                     ","                     ","                     ","                     ","                     ","                     ","                     "],
+  hair_5: ["                     ","         _._         ","        (\\!/)        ","      .(|||||).      ","     ((/·'~`·\\))     ","     (         )     ","                     ","                     ","                     ","                     ","                     ","                     ","                     "],
+  hair_6: ["                     ","                     ","        _..._        ","      (((|||)))      ","     ((//'~`\\\\))     ","    ((!       !))    ","    ((         ))    ","     ))       ((     ","     (         )     ","                     ","                     ","                     ","                     "],
+  hair_7: ["                     ","         _._         ","        (\\!/)        ","      (((|||)))      ","     ((//'~`\\\\))     ","    ((!       !))    ","    ((         ))    ","     ))       ((     ","     (         )     ","                     ","                     ","                     ","                     "],
+  hair_8: ["                     ","                     ","       _.---._       ","     .(((|||))).     ","    (((//'~`\\\\)))    ","    ))!       !((    ","   (((         )))   ","    )))       (((    ","   (((         )))   ","    )))       (((    ","                     ","                     ","                     "],
+  hair_9: ["                     ","                     ","       _.---._       ","     .(((|||))).     ","    (((/(((((\\)))    ","    ))!       !((    ","   (((         )))   ","    )))       (((    ","   (((         )))   ","    )))       (((    ","                     ","                     ","                     "],
+  hair_10:["                     ","                     ","       _.---._       ","     .(((|||))).     ","    (((//'~`\\\\)))    ","    ))!       !((    ","   (((         )))   ","   i)))       (((i   ","  ((((         ))))  ","   ))))       ((((   ","  ((((         ))))  "," i))))       ((((i  "," (((((         ))))) "],
+
+  glasses_0: B(),
+  glasses_1: ["                     ","                     ","                     ","                     ","                     ","                     ","      ~·=·-·=·~      ","                     ","                     ","                     ","                     ","                     ","                     "],
+  glasses_2: ["                     ","                     ","                     ","                     ","                     ","                     ","      ~[=]-[=]~      ","                     ","                     ","                     ","                     ","                     ","                     "],
+  glasses_3: ["                     ","                     ","                     ","                     ","                     ","       __   __       ","      ~(_)-(_)~      ","                     ","                     ","                     ","                     ","                     ","                     "],
+  glasses_4: ["                     ","                     ","                     ","                     ","                     ","       _______       ","      \\__/-\\__/      ","                     ","                     ","                     ","                     ","                     ","                     "],
+  glasses_5: ["                     ","                     ","                     ","                     ","                     ","       _______       ","      (░░/-\\░░)      ","       `'   `'       ","                     ","                     ","                     ","                     ","                     "],
+
+  hat_0: B(),
+  hat_1: ["                     ","          _          ","       _.'.`._       ","       `-----'       ","                     ","                     ","                     ","                     ","                     ","                     ","                     ","                     ","                     "],
+  hat_2: ["                     ","         _._         ","       .'·.·`.       ","      :`·...·':      ","       `-...-'       ","                     ","                     ","                     ","                     ","                     ","                     ","                     ","                     "],
+  hat_3: ["                     ","         _._         ","       .'...`.       ","      {·~'!`~·}      ","       `-----'       ","                     ","                     ","                     ","                     ","                     ","                     ","                     ","                     "],
+  hat_4: ["                     ","         _._         ","       .'...`.       ","     .'·.....·`.     ","      `-.....-'      ","                     ","                     ","                     ","                     ","                     ","                     ","                     ","                     "],
+  hat_5: ["                     ","        _..._        ","      .'·...·`.      ","     :`·.....·':     ","      `-.....-'      ","                     ","                     ","                     ","                     ","                     ","                     ","                     ","                     "],
+  hat_6: ["                     ","        .---.        ","       !·...·!       ","     .'·.....·`.     ","      `-.....-'      ","                     ","                     ","                     ","                     ","                     ","                     ","                     ","                     "],
+  hat_7: ["                     ","        _..._        ","       i·...·i       ","     .-!·...·!-.     ","      `-.....-'      ","                     ","                     ","                     ","                     ","                     ","                     ","                     ","                     "],
+  hat_8: ["                     ","        .---.        ","       i·...·i       ","    .--!·...·!--.    ","     `-.......-'     ","                     ","                     ","                     ","                     ","                     ","                     ","                     ","                     "],
+  hat_9: ["                     ","     _.._.._.._.     ","    / · * · * · \\    ","   !·*·.....·*·!     ","    `~~~~~~~~~~~~'   ","                     ","                     ","                     ","                     ","                     ","                     ","                     ","                     "],
+};
+
+// ─── LIMITS ──────────────────────────────────────────────────────────────────
+const LIMITS = { cloth:7, chin:8, eyebrows:8, eyes:5, noze:7, extras:6, mouth:5, hair:10, glasses:5, hat:9 };
+
+// ─── MERGE ───────────────────────────────────────────────────────────────────
+function merge(a, b) {
+  return a.map((rowA, i) => {
+    const rowB = b[i] || "                     ";
+    return rowA.split("").map((ch, j) => {
+      const bc = rowB[j] || " ";
+      if (bc === " ") return ch;
+      if (bc === "░") return " ";
+      return bc;
+    }).join("");
+  });
+}
+
+// ─── BUILD FACE ──────────────────────────────────────────────────────────────
+function getLayer(name, idx) { return A[name + "_" + idx] || B(); }
+
+function buildFace(f) {
+  let r = B();
+  r = merge(r, getLayer("cloth", f.cloth));
+  r = merge(r, getLayer("chin", f.chin));
+  r = merge(r, getLayer("eyebrows", f.eyebrows));
+  r = merge(r, getLayer("eyes", f.eyes));
+  r = merge(r, getLayer("mouth", f.mouth));
+  r = merge(r, getLayer("extras", f.extras));
+  r = merge(r, getLayer("noze", f.noze));
+  r = merge(r, getLayer("hair", f.hair));
+  r = merge(r, getLayer("glasses", f.glasses));
+  r = merge(r, getLayer("hat", f.hat));
+  return r;
+}
+
+function randomFace() {
+  const rnd = max => Math.floor(Math.random() * (max + 1));
+  return {
+    cloth: rnd(LIMITS.cloth), chin: rnd(LIMITS.chin), eyebrows: rnd(LIMITS.eyebrows),
+    eyes: rnd(LIMITS.eyes), noze: rnd(LIMITS.noze),
+    extras: Math.random() > 0.5 ? rnd(LIMITS.extras) : 0,
+    mouth: rnd(LIMITS.mouth), hair: rnd(LIMITS.hair),
+    glasses: Math.random() > 0.7 ? rnd(LIMITS.glasses) : 0,
+    hat: Math.random() > 0.7 ? rnd(LIMITS.hat) : 0,
+  };
+}
+
+// ─── INTRO LOGO ──────────────────────────────────────────────────────────────
+const INTRO = [
+  "    _    ____   ____ ___ ___   _____                                          ",
+  "   / \\  / ___| / ___|_ _|_ _| |  ___|_ _  ___ ___                            ",
+  "  / _ \\ \\___ \\| |    | | | |  | |_ / _` |/ __/ _ \\  Maker                   ",
+  " / ___ \\ ___) | |___ | | | |  |  _| (_| | (_|  __/                           ",
+  "/_/   \\_\\____/ \\____|___|___| |_|  \\__,_|\\___\\___|                           ",
+];
+
+// ─── APP STATE ───────────────────────────────────────────────────────────────
+const terminal = document.getElementById('terminal');
+let face = randomFace();
+let cmds = new Map();
+let input = "";
+
+// ─── RENDER ──────────────────────────────────────────────────────────────────
+function render(lines, newCmds) {
+  cmds = newCmds;
+  terminal.innerHTML = "";
+  lines.forEach(line => {
+    const m = line.match(/^\[ (\d+) \]/);
+    const span = document.createElement('span');
+    span.style.display = 'block';
+    if (m) {
+      span.className = 'cmd-line';
+      span.onclick = () => { cmds.get(parseInt(m[1]))?.(); };
+    }
+    span.textContent = line;
+    terminal.appendChild(span);
+  });
+  const inputSpan = document.createElement('span');
+  inputSpan.id = 'input-display';
+  inputSpan.textContent = input;
+  terminal.appendChild(inputSpan);
+  const cur = document.createElement('span');
+  cur.className = 'cursor';
+  cur.textContent = '█';
+  terminal.appendChild(cur);
+}
+
+function recolor() {
+  const c = randomColors();
+  applyColors(c.fg, c.bg);
+}
+
+// ─── MENUS ───────────────────────────────────────────────────────────────────
+function mainMenu(f) {
+  f = f || face;
+  recolor();
+  const c = new Map();
+  const fl = buildFace(f);
+  const lines = ["Main menu", ...fl, ""];
+  c.set(1, () => faceMenu(face));       lines.push("[ 1 ] Face");
+  c.set(2, () => pilosityMenu(face));   lines.push("[ 2 ] Pilosity");
+  c.set(3, () => accessMenu(face));     lines.push("[ 3 ] Accessories");
+  c.set(4, () => { face = randomFace(); mainMenu(face); }); lines.push("[ 4 ] Randomize");
+  lines.push("");
+  c.set(0, () => optionsMenu(face));    lines.push("[ 0 ] Options");
+  render(lines, c);
+}
+
+function optionsMenu(f) {
+  f = f || face;
+  recolor();
+  const c = new Map();
+  const fl = buildFace(f);
+  const lines = ["Options menu", ...fl, ""];
+  c.set(0, () => mainMenu(face));  lines.push("[ 0 ] Back to main menu");
+  c.set(1, () => saveMenu(face));  lines.push("[ 1 ] Save face");
+  c.set(2, () => colorsMenu(face)); lines.push("[ 2 ] Change colors");
+  render(lines, c);
+}
+
+function saveMenu(f) {
+  f = f || face;
+  recolor();
+  const c = new Map();
+  const fl = buildFace(f);
+  const lines = ["Save face menu", ...fl, ""];
+  c.set(0, () => optionsMenu(face)); lines.push("[ 0 ] Back to options");
+  c.set(1, () => {
+    try { navigator.clipboard.writeText(buildFace(face).join("\n")); } catch(e){}
+    saveMenu(face);
+  });
+  lines.push("[ 1 ] Copy as text");
+  render(lines, c);
+}
+
+function colorsMenu(f) {
+  f = f || face;
+  recolor();
+  const c = new Map();
+  const fl = buildFace(f);
+  const lines = ["Change colors menu", ...fl, ""];
+  c.set(0, () => optionsMenu(face)); lines.push("[ 0 ] Back to options");
+  const pairs = [
+    ["#FFF","#000"],["#F88","#000"],["#8F8","#000"],["#88F","#000"],
+    ["#FF8","#000"],["#8FF","#000"],["#F8F","#000"],["#000","#FFF"],
+    ["#FFA","#330"],["#0FF","#033"],["#F80","#200"],["#CFC","#010"],
+  ];
+  pairs.forEach(([fg2, bg2], i) => {
+    const n = i + 1;
+    c.set(n, () => { applyColors(fg2, bg2); colorsMenu(face); });
+    lines.push("[ " + n + " ] " + fg2 + " on " + bg2);
+  });
+  render(lines, c);
+}
+
+function changeMenu(what, back, fromLabel, f) {
+  f = f || face;
+  recolor();
+  const c = new Map();
+  const fl = buildFace(f);
+  const lim = LIMITS[what] || 5;
+  const cur = f[what];
+  const lines = ["Change " + what + " menu", ...fl, "",
+    "Enter a number between 1 and " + (lim + 1) + " (currently " + (cur + 1) + ")", ""];
+  c.set(0, () => back(face));
+  lines.push("[ 0 ] Back to " + fromLabel);
+  for (let i = 0; i <= lim; i++) {
+    const idx = i;
+    c.set(i + 1, () => { face[what] = idx; changeMenu(what, back, fromLabel, face); });
+  }
+  render(lines, c);
+}
+
+function faceMenu(f) {
+  f = f || face;
+  recolor();
+  const c = new Map();
+  const fl = buildFace(f);
+  const lines = ["Face menu", ...fl, ""];
+  c.set(0, () => mainMenu(face));                                       lines.push("[ 0 ] Back to main menu");
+  c.set(1, () => changeMenu("chin", faceMenu, "face menu", face));      lines.push("[ 1 ] Chin");
+  c.set(2, () => changeMenu("noze", faceMenu, "face menu", face));      lines.push("[ 2 ] Noze");
+  c.set(3, () => changeMenu("eyes", faceMenu, "face menu", face));      lines.push("[ 3 ] Eyes");
+  c.set(4, () => changeMenu("mouth", faceMenu, "face menu", face));     lines.push("[ 4 ] Mouth");
+  render(lines, c);
+}
+
+function pilosityMenu(f) {
+  f = f || face;
+  recolor();
+  const c = new Map();
+  const fl = buildFace(f);
+  const lines = ["Pilosity menu", ...fl, ""];
+  c.set(0, () => mainMenu(face));                                            lines.push("[ 0 ] Back to main menu");
+  c.set(1, () => changeMenu("eyebrows", pilosityMenu, "pilosity menu", face)); lines.push("[ 1 ] Eyebrows");
+  c.set(2, () => changeMenu("extras", pilosityMenu, "pilosity menu", face));   lines.push("[ 2 ] Extras");
+  c.set(3, () => changeMenu("hair", pilosityMenu, "pilosity menu", face));     lines.push("[ 3 ] Hair");
+  render(lines, c);
+}
+
+function accessMenu(f) {
+  f = f || face;
+  recolor();
+  const c = new Map();
+  const fl = buildFace(f);
+  const lines = ["Accessories menu", ...fl, ""];
+  c.set(0, () => mainMenu(face));                                              lines.push("[ 0 ] Back to main menu");
+  c.set(1, () => changeMenu("cloth", accessMenu, "accessories menu", face));   lines.push("[ 1 ] Clothes");
+  c.set(2, () => changeMenu("glasses", accessMenu, "accessories menu", face)); lines.push("[ 2 ] Glasses");
+  c.set(3, () => changeMenu("hat", accessMenu, "accessories menu", face));     lines.push("[ 3 ] Hat");
+  render(lines, c);
+}
+
+function introMenu() {
+  const c = new Map();
+  const fl = buildFace(face);
+  const lines = ["Version 1.0 2026", ...INTRO, ...fl, ""];
+  c.set(0, () => { face = randomFace(); mainMenu(face); });
+  lines.push("[ 0 ] Start (type the command number then press ENTER)");
+  render(lines, c);
+}
+
+// ─── KEYBOARD ────────────────────────────────────────────────────────────────
+window.addEventListener('keydown', e => {
+  if (e.key === 'Enter') {
+    const n = parseInt(input, 10);
+    if (!isNaN(n)) cmds.get(n)?.();
+    input = "";
+    const d = document.getElementById('input-display');
+    if (d) d.textContent = "";
+  } else if (e.key === 'Backspace') {
+    input = input.slice(0, -1);
+    const d = document.getElementById('input-display');
+    if (d) d.textContent = input;
+  } else if (/^\d$/.test(e.key)) {
+    input += e.key;
+    const d = document.getElementById('input-display');
+    if (d) d.textContent = input;
+  }
+});
+
+// ─── INIT ────────────────────────────────────────────────────────────────────
+updateFont();
+applyColors(colors.fg, colors.bg);
+introMenu();
+</script>
+</body>
+</html>
