@@ -1,7 +1,7 @@
 # ASCII-Avatar 🖥️
 
 [![Deployment Status](https://img.shields.io/github/deployments/itishacodes/ASCII-Avatar/github-pages?label=Live%20Demo&color=2ea44f)](https://itishacodes.github.io/ASCII-Avatar/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
 
 An ultra-minimalist, retro textmode avatar generator deeply inspired by 1980s terminal installations, BIOS setup screens, and net-art constraints. 
 
